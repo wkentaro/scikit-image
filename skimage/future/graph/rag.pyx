@@ -1,3 +1,4 @@
+cimport numpy as cnp
 import networkx as nx
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
@@ -35,7 +36,10 @@ def _edge_generator_from_csr(csr_matrix):
     >>> list(edges)
     [(0, 0, 1.0), (1, 1, 1.0)]
     """
-    nrows = csr_matrix.shape[0]
+    cdef Py_ssize_t i, j
+    cdef float w
+
+    cdef Py_ssize_t nrows = csr_matrix.shape[0]
     values = csr_matrix.data
     indptr = csr_matrix.indptr
     col_indices = csr_matrix.indices
@@ -44,7 +48,7 @@ def _edge_generator_from_csr(csr_matrix):
             yield i, col_indices[j], values[j]
 
 
-def min_weight(graph, src, dst, n):
+cdef float min_weight(graph, Py_ssize_t src, Py_ssize_t dst, Py_ssize_t n):
     """Callback to handle merging nodes by choosing minimum weight.
 
     Returns a dictionary with `"weight"` set as either the weight between
@@ -68,6 +72,7 @@ def min_weight(graph, src, dst, n):
         both exist.
 
     """
+    cdef float w1, w2
 
     # cover the cases where n only has edge to either `src` or `dst`
     default = {'weight': np.inf}
@@ -76,7 +81,7 @@ def min_weight(graph, src, dst, n):
     return {'weight': min(w1, w2)}
 
 
-def _add_edge_filter(values, graph):
+cdef float _add_edge_filter(values, graph):
     """Create edge in `graph` between central element of `values` and the rest.
 
     Add an edge between the middle element in `values` and
@@ -130,7 +135,7 @@ class RAG(nx.Graph):
         Additional attributes to add to the graph.
     """
 
-    def __init__(self, label_image=None, connectivity=1, data=None, **attr):
+    def __init__(self, cnp.ndarray[cnp.int64_t, ndim=2] label_image, Py_ssize_t connectivity=1, data=None, **attr):
 
         super(RAG, self).__init__(data, **attr)
         if self.number_of_nodes() == 0:
@@ -157,7 +162,7 @@ class RAG(nx.Graph):
                                   strides=((0,) * label_image.ndim)),
                 extra_arguments=(self,))
 
-    def merge_nodes(self, src, dst, weight_func=min_weight, in_place=True,
+    def merge_nodes(self, Py_ssize_t src, Py_ssize_t dst, weight_func=min_weight, Py_ssize_t in_place=True,
                     extra_arguments=[], extra_keywords={}):
         """Merge node `src` and `dst`.
 
@@ -195,6 +200,10 @@ class RAG(nx.Graph):
         If `in_place` is `False` the resulting node has a new id, rather than
         `dst`.
         """
+        cdef float w
+        cdef Py_ssize_t new
+        cdef Py_ssize_t id
+
         src_nbrs = set(self.neighbors(src))
         dst_nbrs = set(self.neighbors(dst))
         neighbors = (src_nbrs | dst_nbrs) - set([src, dst])
@@ -219,7 +228,7 @@ class RAG(nx.Graph):
 
         return new
 
-    def add_node(self, n, attr_dict=None, **attr):
+    def add_node(self, Py_ssize_t n, attr_dict=None, **attr):
         """Add node `n` while updating the maximum node id.
 
         .. seealso:: :func:`networkx.Graph.add_node`."""
@@ -230,7 +239,7 @@ class RAG(nx.Graph):
         super(RAG, self).add_node(n, **attr_dict)
         self.max_id = max(n, self.max_id)
 
-    def add_edge(self, u, v, attr_dict=None, **attr):
+    def add_edge(self, Py_ssize_t u, Py_ssize_t v, attr_dict=None, **attr):
         """Add an edge between `u` and `v` while updating max node id.
 
         .. seealso:: :func:`networkx.Graph.add_edge`."""
