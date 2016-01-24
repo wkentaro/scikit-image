@@ -1,8 +1,9 @@
+cimport numpy as cnp
 import numpy as np
 import heapq
 
 
-def _revalidate_node_edges(rag, node, heap_list):
+cdef _revalidate_node_edges(rag, Py_ssize_t node, heap_list):
     """Handles validation and invalidation of edges incident to a node.
 
     This function invalidates all existing edges incident on `node` and inserts
@@ -21,6 +22,9 @@ def _revalidate_node_edges(rag, node, heap_list):
     # heap if their weight is updated.
     # instead we invalidate them
 
+    cdef Py_ssize_t nbr
+    cdef cnp.float64_t wt
+
     for nbr in rag.neighbors(node):
         data = rag[node][nbr]
         try:
@@ -38,8 +42,10 @@ def _revalidate_node_edges(rag, node, heap_list):
         heapq.heappush(heap_list, heap_item)
 
 
-def _rename_node(graph, node_id, copy_id):
+cdef _rename_node(graph, Py_ssize_t node_id, Py_ssize_t copy_id):
     """ Rename `node_id` in `graph` to `copy_id`. """
+    cdef Py_ssize_t nbr
+    cdef cnp.float64_t wt
 
     graph._add_node_silent(copy_id)
     graph.node[copy_id] = graph.node[node_id]
@@ -51,12 +57,17 @@ def _rename_node(graph, node_id, copy_id):
     graph.remove_node(node_id)
 
 
-def _invalidate_edge(graph, n1, n2):
+cdef _invalidate_edge(graph, Py_ssize_t n1, Py_ssize_t n2):
     """ Invalidates the edge (n1, n2) in the heap. """
     graph[n1][n2]['heap item'][3] = False
 
 
-def merge_hierarchical(labels, rag, thresh, rag_copy, in_place_merge,
+def merge_hierarchical(cnp.ndarray[cnp.int64_t, ndim=2] labels, rag, float thresh, Py_ssize_t rag_copy, Py_ssize_t in_place_merge,
+                       merge_func, weight_func):
+    return _merge_hierarchical(labels, rag, thresh, rag_copy, in_place_merge, merge_func, weight_func)
+
+
+cdef cnp.ndarray[cnp.int64_t, ndim=1] _merge_hierarchical(cnp.ndarray[cnp.int64_t, ndim=2] labels, rag, float thresh, Py_ssize_t rag_copy, Py_ssize_t in_place_merge,
                        merge_func, weight_func):
     """Perform hierarchical merging of a RAG.
 
@@ -92,6 +103,18 @@ def merge_hierarchical(labels, rag, thresh, rag_copy, in_place_merge,
         The new labeled array.
 
     """
+    cdef cnp.int64_t n1
+    cdef cnp.int64_t n2
+    cdef cnp.float64_t wt
+    cdef cnp.int64_t nbr
+    cdef cnp.int64_t next_id
+    cdef cnp.int64_t src
+    cdef cnp.int64_t dst
+    cdef cnp.int64_t new_id
+    cdef cnp.int64_t label
+    cdef Py_ssize_t ix
+    cdef cnp.ndarray[cnp.int64_t, ndim=1] label_map
+
     if rag_copy:
         rag = rag.copy()
 
@@ -111,7 +134,6 @@ def merge_hierarchical(labels, rag, thresh, rag_copy, in_place_merge,
         # Ensure popped edge is valid, if not, the edge is discarded
         if valid:
             # Invalidate all neigbors of `src` before its deleted
-
             for nbr in rag.neighbors(n1):
                 _invalidate_edge(rag, n1, nbr)
 

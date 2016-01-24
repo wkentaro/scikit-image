@@ -14,8 +14,10 @@ def configuration(parent_package='', top_path=None):
 
     # This function tries to create C files from the given .pyx files.  If
     # it fails, try to build with pre-generated .c files.
-    cython(['_ncut_cy.pyx'], working_path=base_path)
+    cython(['_ncut_cy.pyx', 'graph_merge.pyx'], working_path=base_path)
     config.add_extension('_ncut_cy', sources=['_ncut_cy.c'],
+                         include_dirs=[get_numpy_include_dirs()])
+    config.add_extension('graph_merge', sources=['graph_merge.c'],
                          include_dirs=[get_numpy_include_dirs()])
     return config
 
